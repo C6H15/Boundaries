@@ -1,7 +1,7 @@
 --!strict
 --!native
 --!optimize 2
--- v1.1.0
+-- Boundaries v1.1.0 - https://github.com/C6H15/Boundaries
 -- @c6h15
 -- Inspired by QuickBounds by @unityjaeger.
 type _Shape = "Block" | "Ball" | "Complex"
