@@ -1,9 +1,9 @@
 --!strict
 --!native
 --!optimize 2
--- @c6h15k2
+-- @c6h15
 -- Inspired by QuickBounds by @unityjaeger.
-type _Shape = "Block" | "Ball"
+type _Shape = "Block" | "Ball" | "Complex"
 type _Presences = { [number]: boolean }
 type _RegisteredPart = {
 	CallbackData: { [string]: any },
@@ -47,8 +47,10 @@ type _BVHNode = {
 local RunService = game:GetService("RunService")
 
 local OutdatedBVH: boolean = false
-local FrameBudget: number = 0.0001
+local FrameBudget: number = 0.0002
 
+local PostSimulationConnection: RBXScriptConnection? = nil
+local ComplexOverlapParams: OverlapParams = nil
 local LastPart: BasePart? = nil
 
 local Boundaries = {}
@@ -197,23 +199,33 @@ local function RemoveRegisteredPart(Part: BasePart)
 	RegisteredParts[Part].Connection:Disconnect()
 	RegisteredParts[Part] = nil
 end
-local function PointInBoundary(Boundary: _Boundary, Position: Vector3): boolean
+local function PointInBoundary(Boundary: _Boundary, Part: BasePart): boolean
+	local Position: Vector3 = Part.Position
 	if Boundary.Shape == "Block" then
 		local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
 		return vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition
 	elseif Boundary.Shape == "Ball" then
 		return vector.magnitude(Boundary.Position - Position) <= Boundary.Radius :: number
+	elseif Boundary.Shape == "Complex" then
+		if Boundary.Part ~= nil then
+			local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
+			if vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition then
+				ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part}
+				return #workspace:GetPartsInPart(Part, ComplexOverlapParams) > 0
+			end
+		end
 	end
 	return false
 end
-local function QueryBoundaries(Node: _BVHNode?, Position: Vector3, Callback: (Index: number) -> ())
+local function QueryBoundaries(Node: _BVHNode?, Part: BasePart, Callback: (Index: number) -> ())
+	local Position: Vector3 = Part.Position
 	if Node == nil or vector.clamp(Position, Node.Min, Node.Max) ~= Position then return end
 	if Node.Index ~= nil then
 		local Boundary = BoundaryData[Node.Index]
-		if Boundary ~= nil and PointInBoundary(Boundary, Position) then Callback(Node.Index) end
+		if Boundary ~= nil and PointInBoundary(Boundary, Part) then Callback(Node.Index) end
 	else
-		if Node.LeftNode ~= nil then QueryBoundaries(Node.LeftNode, Position, Callback) end
-		if Node.RightNode ~= nil then QueryBoundaries(Node.RightNode, Position, Callback) end
+		if Node.LeftNode ~= nil then QueryBoundaries(Node.LeftNode, Part, Callback) end
+		if Node.RightNode ~= nil then QueryBoundaries(Node.RightNode, Part, Callback) end
 	end
 end
 local function OnPostSimulation(DeltaTime: number)
@@ -231,7 +243,7 @@ local function OnPostSimulation(DeltaTime: number)
 		LastPart = Part
 		table.clear(CurrentBoundaries)
 		local QueryStartTime: number = os.clock()
-		QueryBoundaries(BVHRoot, Part.Position, function(Index)
+		QueryBoundaries(BVHRoot, Part, function(Index)
 			table.insert(CurrentBoundaries, Index)
 		end)
 		for Group, LastPresences in RegisteredPart.Groups do
@@ -279,6 +291,21 @@ local function OnPostSimulation(DeltaTime: number)
 	--	print(string.format("Frame: %d parts in %.4fms.", PartCount, TotalTime * 1000))
 	--end
 end
+-- Functions
+function Boundaries.EnableCollisionDetection()
+	if typeof(PostSimulationConnection) ~= "RBXScriptConnection" then
+		PostSimulationConnection = RunService.PostSimulation:Connect(OnPostSimulation)
+	end
+end
+function Boundaries.DisableCollisionDetection()
+	if typeof(PostSimulationConnection) == "RBXScriptConnection" then
+		PostSimulationConnection:Disconnect()
+		PostSimulationConnection = nil
+	end
+end
+function Boundaries.SetFrameBudgetMillis(Value: number)
+	if type(Value) ~= "number" then warn("Value must be a number.") else FrameBudget = Value / 1000 end
+end
 -- Create Boundaries
 function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): _CreatedBoundary
 	if type(Shape) ~= "string" then
@@ -305,6 +332,14 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 			error(`{Name} ({Shape}) must have equal dimensions.`)
 		end
 		Boundary.Radius = Boundary.HalfSize.Y
+	elseif Shape == "Complex" then
+		if Part == nil then error("Complex shape requires an associated part.", 2) end
+		Part.CanQuery = true
+		if ComplexOverlapParams == nil then
+			ComplexOverlapParams = OverlapParams.new()
+			ComplexOverlapParams.FilterType = Enum.RaycastFilterType.Include
+			--ComplexOverlapParams.FilterDescendantsInstances = {}
+		end
 	end
 	local Index = InsertBoundary(Boundary)
 	BoundaryGroups[Index] = {}
@@ -334,6 +369,8 @@ function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _Crea
 		else
 			error(`{PartName} is an unsupported {PartType.Name}-shaped part.`)
 		end
+	elseif Part:IsA("UnionOperation") or Part:IsA("MeshPart") then
+		Shape = "Complex"
 	else
 		Shape = "Block"
 	end
@@ -404,6 +441,7 @@ function Boundaries.UnassignGroups(Part: BasePart, ...: string)
 end
 -- OnEntered/OnExited Callbacks
 function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -> ()
+	if PostSimulationConnection == nil then warn(`{script.Name} hasn't been enabled.`) end
 	if type(Group) ~= "string" then
 		error("Group must be a string.", 2)
 	elseif type(Callback) ~= "function" then
@@ -430,6 +468,7 @@ function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -
 	end
 end
 function Boundaries.OnExited(Group: string, Callback: _EnterExitCallback): () -> ()
+	if PostSimulationConnection == nil then warn(`{script.Name} hasn't been enabled.`) end
 	if type(Group) ~= "string" then
 		error("Group must be a string.", 2)
 	elseif type(Callback) ~= "function" then
@@ -455,7 +494,5 @@ function Boundaries.OnExited(Group: string, Callback: _EnterExitCallback): () ->
 		end
 	end
 end
-
-RunService.PostSimulation:Connect(OnPostSimulation)
 
 return Boundaries
