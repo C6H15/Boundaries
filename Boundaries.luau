@@ -1,6 +1,7 @@
 --!strict
 --!native
 --!optimize 2
+-- Boundaries v1.1.0 - https://github.com/C6H15/Boundaries
 -- @c6h15
 -- Inspired by QuickBounds by @unityjaeger.
 type _Shape = "Block" | "Ball" | "Complex"
@@ -393,6 +394,18 @@ function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: an
 	if RegisteredPart == nil then
 		local function OnAncestryChanged(_, Parent: Instance)
 			if Parent ~= nil then return end
+			for Group, Presences in RegisteredPart.Groups do
+				local GroupCallbacks = BoundaryCallbacks[Group]
+				if GroupCallbacks == nil then continue end
+				for Index, Inside in Presences do
+					if not Inside then continue end
+					local Boundary = BoundaryData[Index]
+					if Boundary == nil then continue end
+					for _, Callback in GroupCallbacks.Exited do
+						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData)
+					end
+				end
+			end
 			RemoveRegisteredPart(Part)
 		end
 		RegisteredPart = {
