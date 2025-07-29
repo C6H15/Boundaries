@@ -1,6 +1,7 @@
 --!strict
 --!native
 --!optimize 2
+-- v1.1.0
 -- @c6h15
 -- Inspired by QuickBounds by @unityjaeger.
 type _Shape = "Block" | "Ball" | "Complex"
