@@ -81,7 +81,19 @@ Registers a callback for when a part enters a boundary with the specified group.
 ```luau
 function Boundaries.OnEntered(
 	Group: string,
-	Callback: _EnterExitCallback
+	Callback: (
+		Boundary: {
+			Name: string,
+			Shape: _Shape,
+			CFrame: CFrame,
+			Position: Vector3,
+			HalfSize: Vector3,
+			Part: BasePart?,
+			Radius: number?, -- Exists only for ball shapes.
+		},
+		TrackedPart: BasePart,
+		CallbackData: any
+	) -> () -- Callback gets the boundary data, detected part, and any associated data.
 ): () -> () -- A function that deregisters the callback when called.
 ```
 ### Boundaries.OnExited()
@@ -90,7 +102,19 @@ Registers a callback for when a part exits a boundary with the specified group.
 ```luau
 function Boundaries.OnExited(
 	Group: string,
-	Callback: _EnterExitCallback
+	Callback: (
+		Boundary: {
+			Name: string,
+			Shape: _Shape,
+			CFrame: CFrame,
+			Position: Vector3,
+			HalfSize: Vector3,
+			Part: BasePart?,
+			Radius: number?, -- Exists only for ball shapes.
+		},
+		TrackedPart: BasePart,
+		CallbackData: any
+	) -> () -- Callback gets the boundary data, detected part, and any associated data.
 ): () -> () -- A function that deregisters the callback when called.
 ```
 
