@@ -118,33 +118,14 @@ function Boundaries.OnExited(
 ): () -> () -- A function that deregisters the callback when called.
 ```
 
-## Example
-```luau
-local Players = game:GetService("Players")
+## Examples
+<details>
+	<summary>Server</summary>
+</details>
 
-local Boundaries = require(path.to.Boundaries)
-Boundaries.EnableCollisionDetection()
-
-local BoundaryOne = Boundaries.CreateBoundaryFromPart(path.to.Part)
-BoundaryOne:TrackGroups("Players")
-
-Boundaries.OnEntered("Players", function(Boundary, Part, Data)
-	-- Your logic here.
-end)
-Boundaries.OnExited("Players", function(Boundary, Part, Data)
-	-- Your logic here.
-end)
-
-local function OnPlayerAdded(Player)
-	local Character = Player.Character or Player.CharacterAdded:Wait()
-	local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-	Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
-end
-Players.PlayerAdded:Connect(OnPlayerAdded)
-for _, Player in Players:GetPlayers() do
-	OnPlayerAdded(Player)
-end
-```
+<details>
+	<summary>Client</summary>
+</details>
 
 ## Credits
 Inspired by [QuickBounds](https://github.com/unityjaeger/QuickBounds) by [@unityjaeger](https://github.com/unityjaeger).
