@@ -1,7 +1,7 @@
 --!strict
 --!native
 --!optimize 2
--- Boundaries v1.1.0 - https://github.com/C6H15/Boundaries
+-- Boundaries v1.1.1 - https://github.com/C6H15/Boundaries
 -- @c6h15
 -- Inspired by QuickBounds by @unityjaeger.
 type _Shape = "Block" | "Ball" | "Complex"
@@ -129,11 +129,10 @@ local function CreateBVHNode(StartIndex: number, EndIndex: number, MinBounds: { 
 	}
 end
 local function CreateBVH(): _BVHNode?
-	local BoundaryCount: number = #BoundaryData
-	if BoundaryCount == 0 then return end
+	if #BoundaryData == 0 then return end
 	local MinBounds, MaxBounds = CalculateBounds()
-	local BoundaryMinBounds, BoundaryMaxBounds = table.create(BoundaryCount), table.create(BoundaryCount)
-	local BVHItems: {_BVHItem} = table.create(BoundaryCount)
+	local BoundaryMinBounds, BoundaryMaxBounds = {}, {}
+	local BVHItems: {_BVHItem} = {}
 	for Index, Boundary in BoundaryData do
 		local Min, Max = CalculateAABB(Boundary)
 		BoundaryMinBounds[Index] = Min
@@ -146,7 +145,7 @@ local function CreateBVH(): _BVHNode?
 	table.sort(BVHItems, function(a, b)
 		return a.MortonCode < b.MortonCode
 	end)
-	return CreateBVHNode(1, BoundaryCount, BoundaryMinBounds, BoundaryMaxBounds, BVHItems)
+	return CreateBVHNode(1, #BVHItems, BoundaryMinBounds, BoundaryMaxBounds, BVHItems)
 end
 local function InsertBoundary(Boundary: _Boundary): number
 	local Output: number
