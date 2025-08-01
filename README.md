@@ -1,6 +1,8 @@
 # Boundaries
 Create dynamic spatial boundaries using Bounding Volume Hierarchy (BVH) with Morton codes for efficient collision detection and boundary management.
 
+Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6H15/Boundaries/releases/latest).
+
 ## Functions
 ### Boundaries.EnableCollisionDetection()
 Starts the boundary collision detection.
@@ -119,82 +121,94 @@ function Boundaries.OnExited(
 ```
 
 ## Examples
-### Server
+<details>
+<summary>Server</summary>
+
 ```luau
 local Players = game:GetService("Players")
 
-local Boundaries = require(PATH_TO_BOUNDARIES_MODULE) -- Update to the proper require path.
+local Boundaries = require(PATH_TO_BOUNDARIES)
 Boundaries.EnableCollisionDetection()
 
-local BoundariesFolder = workspace.PATH_TO_BOUNDARY_PARTS -- Update to the proper folder path.
-for _, BoundaryPart in BoundariesFolder:GetChildren() do
-	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
-	Boundary:TrackGroups("Players")
+local function OnPlayerAdded(Player: Player)
+	local function OnCharacterAdded(Character: Model)
+		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
+	end
+	Player.CharacterAdded:Connect(OnCharacterAdded)
+	if Player.Character ~= nil then
+		OnCharacterAdded(Player.Character)
+	end
 end
 
-Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has entered {Boundary.Name} with {CallbackData}`)
+local PlayesEntered = Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
+	print(`{TrackedPart.Name} has entered {Boundary.Name} with data: {CallbackData}.`)
 end)
-Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has exited {Boundary.Name} with {CallbackData}`)
+local PlayersExited = Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
+	print(`{TrackedPart.Name} has exited {Boundary.Name} with data: {CallbackData}.`)
 end)
-
-local function OnPlayerAdded(Player)
-	local Character = Player.Character or Player.CharacterAdded:Wait()
-	local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-	Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
-end
 
 Players.PlayerAdded:Connect(OnPlayerAdded)
+
 for _, Player in Players:GetPlayers() do
 	task.spawn(OnPlayerAdded, Player)
 end
+for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+	Boundary:TrackGroups("Players")
+end
 ```
-### Client
+</details>
+
+<details>
+<summary>Client</summary>
+	
 ```luau
 local Players = game:GetService("Players")
 
-local Boundaries = require(PATH_TO_BOUNDARIES_MODULE) -- Update to the proper require path.
+local Boundaries = require(PATH_TO_BOUNDARIES)
 Boundaries.EnableCollisionDetection()
 
-local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-
-local BoundariesFolder = workspace.PATH_TO_BOUNDARY_PARTS -- Update to the proper folder path.
-local BoundariesTable = {}
-
-Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
+local function OnPlayerAdded(Player: Player)
+	local function OnCharacterAdded(Character: Model)
+		local Highlight: Highlight = Instance.new("Highlight")
+		Highlight.FillTransparency = 1
+		Highlight.Parent = Character
+		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
+	end
+	Player.CharacterAdded:Connect(OnCharacterAdded)
+	if Player.Character ~= nil then
+		OnCharacterAdded(Player.Character)
+	end
+end
 
 Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has entered {Boundary.Name} with {CallbackData}`)
+	local Character = TrackedPart.Parent
+	if Character == nil then return end
+	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
+	if Highlight == nil then return end
+	Highlight.OutlineColor = Boundary.Part and Boundary.Part.Color or Color3.fromRGB(255, 255, 255)
 end)
 Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has exited {Boundary.Name} with {CallbackData}`)
+	local Character = TrackedPart.Parent
+	if Character == nil then return end
+	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
+	if Highlight == nil then return end
+	Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 end)
 
-local function OnBoundariesAdded(Child)
-	local Boundary = BoundariesTable[Child]
-	if Boundary ~= nil then return end
-	Boundary = Boundaries.CreateBoundaryFromPart(Child)
-	Boundary:TrackGroups("Players")
-	BoundariesTable[Child] = Boundary
-end
-local function OnBoundariesRemoved(Child)
-	local Boundary = BoundariesTable[Child]
-	if Boundary == nil then return end
-	Boundary:Destroy()
-	BoundariesTable[Child] = nil
-end
+Players.PlayerAdded:Connect(OnPlayerAdded)
 
-BoundariesFolder.ChildAdded:Connect(OnBoundariesAdded)
-BoundariesFolder.ChildRemoved:Connect(OnBoundariesRemoved)
-for _, BoundaryPart in BoundariesFolder:GetChildren() do
-	OnBoundariesAdded(BoundaryPart)
+for _, Player in Players:GetPlayers() do
+	task.spawn(OnPlayerAdded, Player)
+end
+for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+	Boundary:TrackGroups("Players")
 end
 ```
-> [!NOTE]
-> Keep in mind the examples provided are basic and meant to give you an idea of how this is used. Client example provided assumes [StreamingEnabled](https://create.roblox.com/docs/workspace/streaming) is turned on, so adjust based on your game's environment.
+</details>
 
 ## Credits
 Inspired by [QuickBounds](https://github.com/unityjaeger/QuickBounds) by [@unityjaeger](https://github.com/unityjaeger).
