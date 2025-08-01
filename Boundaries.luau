@@ -1,8 +1,7 @@
 --!strict
 --!native
 --!optimize 2
--- Boundaries v1.1.1 - https://github.com/C6H15/Boundaries
--- @c6h15
+-- @c6h15, Boundaries v1.2.0 - https://github.com/C6H15/Boundaries
 -- Inspired by QuickBounds by @unityjaeger.
 type _Shape = "Block" | "Ball" | "Complex"
 type _Presences = { [number]: boolean }
@@ -163,7 +162,8 @@ local function TrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
 	if CreatedBoundary.IsDestroyed then return end
 	local Groups = BoundaryGroups[CreatedBoundary.Index]
 	if Groups == nil then return end
-	for i = 1, select("#", ...) do
+	local GroupCount: number = select("#", ...)
+	for i = 1, GroupCount do
 		local Group = select(i, ...)
 		if table.find(Groups, Group) == nil then table.insert(Groups, Group) end
 	end
@@ -172,7 +172,8 @@ local function UntrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
 	if CreatedBoundary.IsDestroyed then return end
 	local Groups = BoundaryGroups[CreatedBoundary.Index]
 	if Groups == nil then return end
-	for i = 1, select("#", ...) do
+	local GroupCount: number = select("#", ...)
+	for i = 1, GroupCount do
 		local Index = table.find(Groups, select(i, ...))
 		if Index ~= nil then table.remove(Groups, Index) end
 	end
@@ -304,13 +305,13 @@ function Boundaries.DisableCollisionDetection()
 	end
 end
 function Boundaries.SetFrameBudgetMillis(Value: number)
-	if type(Value) ~= "number" then warn("Value must be a number.") else FrameBudget = Value / 1000 end
+	if type(Value) == "number" then FrameBudget = Value / 1000 end
 end
--- Create Boundaries
+-- Boundaries
 function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): _CreatedBoundary
 	if type(Shape) ~= "string" then
 		error("Shape must be a string.", 2)
-	elseif Name ~= nil and type(Name) ~= "string" then
+	elseif type(Name) ~= "string" then
 		error("Name must be a string.", 2)
 	elseif typeof(CF) ~= "CFrame" then
 		error("CF must be a CFrame.", 2)
@@ -329,7 +330,7 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 	}
 	if Shape == "Ball" then
 		if Size.X ~= Size.Y or Size.Y ~= Size.Z then
-			error(`{Name} ({Shape}) must have equal dimensions.`)
+			error(`{Name} ({Shape}) must have equal dimensions.`, 2)
 		end
 		Boundary.Radius = Boundary.HalfSize.Y
 	elseif Shape == "Complex" then
@@ -338,7 +339,6 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 		if ComplexOverlapParams == nil then
 			ComplexOverlapParams = OverlapParams.new()
 			ComplexOverlapParams.FilterType = Enum.RaycastFilterType.Include
-			--ComplexOverlapParams.FilterDescendantsInstances = {}
 		end
 	end
 	local Index = InsertBoundary(Boundary)
@@ -353,12 +353,7 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 	}
 end
 function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _CreatedBoundary
-	if typeof(Part) ~= "Instance" or not Part:IsA("BasePart") then
-		error("Part must be a BasePart.", 2)
-	elseif Name ~= nil and type(Name) ~= "string" then
-		error("Name must be a string.", 2)
-	end
-	local PartName: string = Name or Part.Name
+	if typeof(Part) ~= "Instance" then error("Part isn't an Instance.", 2) end
 	local Shape: _Shape
 	if Part:IsA("Part") then
 		local PartType = Part.Shape
@@ -367,28 +362,21 @@ function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _Crea
 		elseif PartType == Enum.PartType.Ball then
 			Shape = "Ball"
 		else
-			error(`{PartName} is an unsupported {PartType.Name}-shaped part.`)
+			error(`{Part.Name} is an unsupported {PartType.Name}-shaped part.`)
 		end
 	elseif Part:IsA("UnionOperation") or Part:IsA("MeshPart") then
 		Shape = "Complex"
 	else
 		Shape = "Block"
 	end
-	return Boundaries.CreateBoundary(Shape, PartName, Part.CFrame, Part.Size, Part)
+	return Boundaries.CreateBoundary(Shape, Name or Part.Name, Part.CFrame, Part.Size, Part)
 end
--- Track/Untrack Parts
-function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: any): _RegisteredPart
-	if typeof(Part) ~= "Instance" or not Part:IsA("BasePart") then
-		error("Part must be a BasePart.", 2)
-	elseif type(Groups) ~= "table" then
-		error("Groups have to be in a table.", 2)
-	end
-	if #Groups == 0 then warn(`No groups were assigned to {Part.Name}.`) end
+-- Parts
+function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: any)
 	local RegisteredPart = RegisteredParts[Part]
 	local GroupSet: { [string]: _Presences } = {}
 	for _, Group in Groups do
-		if type(Group) ~= "string" then error("Not all groups are strings.", 2) end
-		GroupSet[Group] = {}
+		if type(Group) == "string" then GroupSet[Group] = {} end
 	end
 	if RegisteredPart == nil then
 		local function OnAncestryChanged(_, Parent: Instance)
@@ -397,9 +385,8 @@ function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: an
 				local GroupCallbacks = BoundaryCallbacks[Group]
 				if GroupCallbacks == nil then continue end
 				for Index, Inside in Presences do
-					if not Inside then continue end
 					local Boundary = BoundaryData[Index]
-					if Boundary == nil then continue end
+					if not Inside or Boundary == nil then continue end
 					for _, Callback in GroupCallbacks.Exited do
 						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData)
 					end
@@ -416,49 +403,60 @@ function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: an
 	else -- RegisteredPart exists already.
 		RegisteredPart.Groups = GroupSet
 	end
-	return RegisteredPart
 end
 function Boundaries.UntrackPart(Part: BasePart)
-	if typeof(Part) ~= "Instance" or not Part:IsA("BasePart") then error("Part must be a BasePart.", 2) end
 	if RegisteredParts[Part] ~= nil then RemoveRegisteredPart(Part) end
 end
--- Assign/Unassign Groups
-function Boundaries.AssignGroups(Part: BasePart, ...: string)
-	if typeof(Part) ~= "Instance" or not Part:IsA("BasePart") then
-		error("Part must be a BasePart.", 2)
+function Boundaries.GetBoundariesContainingPart(Part: BasePart): {_Boundary}
+	local PartBoundaries = {}
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart ~= nil then
+		for _, Presences in RegisteredPart.Groups do
+			for Index, Inside in Presences do
+				if Inside then table.insert(PartBoundaries, BoundaryData[Index]) end
+			end
+		end
 	end
+	return PartBoundaries
+end
+-- Part Groups
+function Boundaries.AssignGroups(Part: BasePart, ...: string)
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
 	local GroupCount: number = select("#", ...)
-	if GroupCount == 0 then return end
 	for i = 1, GroupCount do
 		local Group = select(i, ...)
-		if type(Group) ~= "string" then error("Not all groups are strings.", 2) end
+		if type(Group) ~= "string" then continue end
 		if RegisteredPart.Groups[Group] == nil then RegisteredPart.Groups[Group] = {} end
 	end
 end
 function Boundaries.UnassignGroups(Part: BasePart, ...: string)
-	if typeof(Part) ~= "Instance" or not Part:IsA("BasePart") then
-		error("Part must be a BasePart.", 2)
-	end
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
 	local GroupCount: number = select("#", ...)
-	if GroupCount == 0 then return end
 	for i = 1, GroupCount do
-		local Group = select(i, ...)
-		if type(Group) ~= "string" then error("Not all groups are strings.", 2) end
-		RegisteredPart.Groups[Group] = nil
+		RegisteredPart.Groups[select(i, ...)] = nil
 	end
 end
--- OnEntered/OnExited Callbacks
-function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -> ()
-	if PostSimulationConnection == nil then warn(`{script.Name} hasn't been enabled.`) end
-	if type(Group) ~= "string" then
-		error("Group must be a string.", 2)
-	elseif type(Callback) ~= "function" then
-		error("Callback must be a function.", 2)
+function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean
+	local GroupCount: number = select("#", ...)
+	if GroupCount == 0 then return false end
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart == nil then return false end
+	local Output: {boolean} = {}
+	for i = 1, GroupCount do Output[i] = RegisteredPart.Groups[select(i, ...)] ~= nil end
+	return table.unpack(Output)
+end
+function Boundaries.GetPartGroups(Part: BasePart): {string}
+	local PartGroups = {}
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart ~= nil then
+		for i, _ in RegisteredPart.Groups do table.insert(PartGroups, i) end
 	end
+	return PartGroups
+end
+-- Callbacks
+function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -> ()
 	local GroupCallbacks = BoundaryCallbacks[Group]
 	local Index: number
 	if GroupCallbacks == nil then
@@ -480,12 +478,6 @@ function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -
 	end
 end
 function Boundaries.OnExited(Group: string, Callback: _EnterExitCallback): () -> ()
-	if PostSimulationConnection == nil then warn(`{script.Name} hasn't been enabled.`) end
-	if type(Group) ~= "string" then
-		error("Group must be a string.", 2)
-	elseif type(Callback) ~= "function" then
-		error("Callback must be a function.", 2)
-	end
 	local GroupCallbacks = BoundaryCallbacks[Group]
 	local Index: number
 	if GroupCallbacks == nil then
