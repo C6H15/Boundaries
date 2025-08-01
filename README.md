@@ -1,6 +1,8 @@
 # Boundaries
 Create dynamic spatial boundaries using Bounding Volume Hierarchy (BVH) with Morton codes for efficient collision detection and boundary management.
 
+Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6H15/Boundaries/releases/latest).
+
 ## Functions
 ### Boundaries.EnableCollisionDetection()
 Starts the boundary collision detection.
@@ -117,6 +119,96 @@ function Boundaries.OnExited(
 	) -> () -- Callback gets the boundary data, detected part, and any associated data.
 ): () -> () -- A function that deregisters the callback when called.
 ```
+
+## Examples
+<details>
+<summary>Server</summary>
+
+```luau
+local Players = game:GetService("Players")
+
+local Boundaries = require(PATH_TO_BOUNDARIES)
+Boundaries.EnableCollisionDetection()
+
+local function OnPlayerAdded(Player: Player)
+	local function OnCharacterAdded(Character: Model)
+		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
+	end
+	Player.CharacterAdded:Connect(OnCharacterAdded)
+	if Player.Character ~= nil then
+		OnCharacterAdded(Player.Character)
+	end
+end
+
+local PlayesEntered = Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
+	print(`{TrackedPart.Name} has entered {Boundary.Name} with data: {CallbackData}.`)
+end)
+local PlayersExited = Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
+	print(`{TrackedPart.Name} has exited {Boundary.Name} with data: {CallbackData}.`)
+end)
+
+Players.PlayerAdded:Connect(OnPlayerAdded)
+
+for _, Player in Players:GetPlayers() do
+	task.spawn(OnPlayerAdded, Player)
+end
+for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+	Boundary:TrackGroups("Players")
+end
+```
+</details>
+
+<details>
+<summary>Client</summary>
+	
+```luau
+local Players = game:GetService("Players")
+
+local Boundaries = require(PATH_TO_BOUNDARIES)
+Boundaries.EnableCollisionDetection()
+
+local function OnPlayerAdded(Player: Player)
+	local function OnCharacterAdded(Character: Model)
+		local Highlight: Highlight = Instance.new("Highlight")
+		Highlight.FillTransparency = 1
+		Highlight.Parent = Character
+		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
+	end
+	Player.CharacterAdded:Connect(OnCharacterAdded)
+	if Player.Character ~= nil then
+		OnCharacterAdded(Player.Character)
+	end
+end
+
+Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
+	local Character = TrackedPart.Parent
+	if Character == nil then return end
+	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
+	if Highlight == nil then return end
+	Highlight.OutlineColor = Boundary.Part and Boundary.Part.Color or Color3.fromRGB(255, 255, 255)
+end)
+Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
+	local Character = TrackedPart.Parent
+	if Character == nil then return end
+	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
+	if Highlight == nil then return end
+	Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+end)
+
+Players.PlayerAdded:Connect(OnPlayerAdded)
+
+for _, Player in Players:GetPlayers() do
+	task.spawn(OnPlayerAdded, Player)
+end
+for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+	Boundary:TrackGroups("Players")
+end
+```
+</details>
 
 ## Credits
 Inspired by [QuickBounds](https://github.com/unityjaeger/QuickBounds) by [@unityjaeger](https://github.com/unityjaeger).
