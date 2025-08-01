@@ -1,160 +1,172 @@
 # Boundaries
-Create dynamic spatial boundaries using Bounding Volume Hierarchy (BVH) with Morton codes for efficient collision detection and boundary management.
+Create dynamic spatial boundaries using Bounding Volume Hierarchy (BVH) with Morton codes for efficient collision detection and boundary management. <br>
+Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6H15/Boundaries/releases/latest) to use.
 
-Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6H15/Boundaries/releases/latest).
+## Types
+### Shape
+```lua
+"Block" | "Ball" | "Complex"
+```
+### Boundary
+```lua
+{
+	IsDestroyed: boolean, -- (Internal Use)
+	Index: number, -- (Internal Use)
+	TrackGroups: (self, ...string) -> (),
+	UntrackGroups: (self, ...string) -> (),
+	Destroy: (self) -> (),
+}
+```
+### BoundaryProperties
+```lua
+{
+	Name: string,
+	Shape: Shape,
+	CFrame: CFrame,
+	Position: Vector3,
+	HalfSize: Vector3,
+	Part: BasePart?,
+	-- Ball
+	Radius: number?,
+}
+```
 
 ## Functions
 ### Boundaries.EnableCollisionDetection()
-Starts the boundary collision detection.
+Starts the boundary collision detection, thus triggering registered callbacks.
 - **Type:** <br>
-```luau
+```lua
 function Boundaries.EnableCollisionDetection()
 ```
 ### Boundaries.DisableCollisionDetection()
-Stops the boundary collision detection.
+Stops the boundary collision detection, thus no longer triggering callbacks.
 - **Type:** <br>
 ```lua
 function Boundaries.DisableCollisionDetection()
 ```
 ### Boundaries.SetFrameBudgetMillis()
-Sets the maximum time (ms) allowed per frame to process boundaries.
+Sets the time budget for collision detection per frame. Processing is distributed across multiple frames when exceeding the budget.
 - **Type:** <br>
-```luau
+```lua
 function Boundaries.SetFrameBudgetMillis(Value: number)
 ```
 - **Default:** 0.2 ms
-> [!NOTE]
-> The frame budget doesn't account for callback completion times, hence it's recommended to keep the budget below 0.5 ms.
+> [!IMPORTANT]
+> The frame budget doesn't account for callback completion time, thus it's recommended to keep the budget below 0.5 ms and monitor performance. Speed of detection depends on the number of processed boundaries and the frame budget. A lower value spreads work across more frames whereas a higher value processes more per frame. It's a trade-off between performance and speed.
 ### Boundaries.CreateBoundary()
-Creates a boundary that can be used to detect parts.
+Creates a boundary for collision detection and returns a table for management.
 - **Type:** <br>
-```luau
-function Boundaries.CreateBoundary(Shape: "Block" | "Ball" | "Complex", Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): {
-	IsDestroyed: boolean,
-	Index: number,
-	TrackGroups: (self, ...string) -> (), -- To specify which groups the boundary should consider.
-	UntrackGroups: (self, ...string) -> (), -- To specify which groups the boundary should stop considering.
-	Destroy: (self) -> (), -- To remove the boundary. Any associated parts will still remain.
-}
+```lua
+function Boundaries.CreateBoundary(Shape: Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): Boundary
 ```
+- **Return:** [`Boundary`](#boundary)
 ### Boundaries.CreateBoundaryFromPart()
-Creates a boundary from an existing part to detect parts.
+Creates a boundary from an existing part for collision detection and returns a table for management.
 - **Type:** <br>
-```luau
-function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): {
-	IsDestroyed: boolean,
-	Index: number,
-	TrackGroups: (self, ...string) -> (), -- To specify which groups the boundary should consider.
-	UntrackGroups: (self, ...string) -> (), -- To specify which groups the boundary should stop considering.
-	Destroy: (self) -> (), -- To remove the boundary. Any associated parts will still remain.
-}
+```lua
+function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): Boundary
 ```
+- **Return:** [`Boundary`](#boundary)
 ### Boundaries.TrackPart()
-Registers a part to be tracked for detection.
+Registers a part to be tracked for collision detection.
 - **Type:** <br>
-```luau
-function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: any): {
-	CallbackData: { [string]: any },
-	Groups: { [string]: { [number]: boolean } },
-	Connection: RBXScriptConnection,
-}
+```lua
+function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: any)
 ```
+> [!NOTE]
+> Tracked parts automatically trigger exit callbacks and are untracked when destroyed. However, in games with [StreamingEnabled](https://create.roblox.com/docs/reference/engine/classes/Workspace#StreamingEnabled), parts must be manually untracked.
 ### Boundaries.UntrackPart()
-Deregisters a part from being tracked for detection.
+Deregisters a part from being tracked for collision detection.
 - **Type:** <br>
-```luau
+```lua
 function Boundaries.UntrackPart(Part: BasePart)
 ```
-### Boundaries.AssignGroups()
-Assigns a part to the specified groups.
+### Boundaries.GetBoundariesContainingPart()
+Gets all boundaries the part is currently in.
 - **Type:** <br>
-```luau
+```lua
+function Boundaries.GetBoundariesContainingPart(Part: BasePart): {BoundaryProperties}
+```
+- **Return:** Array of [`BoundaryProperties`](#boundaryproperties).
+### Boundaries.AssignGroups()
+Assigns the part to the specified groups.
+- **Type:** <br>
+```lua
 function Boundaries.AssignGroups(Part: BasePart, ...: string)
 ```
 ### Boundaries.UnassignGroups()
-Unassigns a part from the specified groups.
+Unassigns the part from the specified groups.
 - **Type:** <br>
-```luau
+```lua
 function Boundaries.UnassignGroups(Part: BasePart, ...: string)
 ```
+### Boundaries.IsPartInGroups()
+Checks if the part is assigned to the specified groups.
+- **Type:** <br>
+```lua
+function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean
+```
+- **Return:** Boolean values that indicate whether the part is assigned to each specified group (in the same order as the inputs).
+### Boundaries.GetPartGroups()
+Gets the part's assigned groups.
+- **Type:** <br>
+```lua
+function Boundaries.GetPartGroups(Part: BasePart): {string}
+```
+- **Return:** Array of groups the part is assigned to.
 ### Boundaries.OnEntered()
 Registers a callback for when a part enters a boundary with the specified group.
 - **Type:** <br>
-```luau
-function Boundaries.OnEntered(
-	Group: string,
-	Callback: (
-		Boundary: {
-			Name: string,
-			Shape: _Shape,
-			CFrame: CFrame,
-			Position: Vector3,
-			HalfSize: Vector3,
-			Part: BasePart?,
-			Radius: number?, -- Exists only for ball shapes.
-		},
-		TrackedPart: BasePart,
-		CallbackData: any
-	) -> () -- Callback gets the boundary data, detected part, and any associated data.
-): () -> () -- A function that deregisters the callback when called.
+```lua
+function Boundaries.OnEntered(Group: string, Callback: (Boundary: BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()): () -> ()
 ```
+- **Return:** Disconnect function to remove the callback.
 ### Boundaries.OnExited()
 Registers a callback for when a part exits a boundary with the specified group.
 - **Type:** <br>
-```luau
-function Boundaries.OnExited(
-	Group: string,
-	Callback: (
-		Boundary: {
-			Name: string,
-			Shape: _Shape,
-			CFrame: CFrame,
-			Position: Vector3,
-			HalfSize: Vector3,
-			Part: BasePart?,
-			Radius: number?, -- Exists only for ball shapes.
-		},
-		TrackedPart: BasePart,
-		CallbackData: any
-	) -> () -- Callback gets the boundary data, detected part, and any associated data.
-): () -> () -- A function that deregisters the callback when called.
+```lua
+function Boundaries.OnExited(Group: string, Callback: (Boundary: BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()): () -> ()
 ```
+- **Return:** Disconnect function to remove the callback.
 
 ## Examples
 <details>
 <summary>Server</summary>
 
-```luau
+```lua
+--!strict
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Boundaries = require(PATH_TO_BOUNDARIES)
-Boundaries.EnableCollisionDetection()
+local Boundaries = require(ReplicatedStorage.Boundaries)
 
+local Folder = workspace.Folder
+
+local function OnEntered(Boundary, TrackedPart, CallbackData)
+	-- TrackedPart has entered Boundary with CallbackData.
+end
+local function OnExited(Boundary, TrackedPart, CallbackData)
+	-- TrackedPart has exited Boundary with CallbackData.
+end
 local function OnPlayerAdded(Player: Player)
 	local function OnCharacterAdded(Character: Model)
-		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+		local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart") :: Part
 		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
 	end
 	Player.CharacterAdded:Connect(OnCharacterAdded)
-	if Player.Character ~= nil then
-		OnCharacterAdded(Player.Character)
-	end
+	if Player.Character ~= nil then OnCharacterAdded(Player.Character) end
 end
 
-local PlayesEntered = Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has entered {Boundary.Name} with data: {CallbackData}.`)
-end)
-local PlayersExited = Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
-	print(`{TrackedPart.Name} has exited {Boundary.Name} with data: {CallbackData}.`)
-end)
-
+Boundaries.OnEntered("Players", OnEntered)
+Boundaries.OnExited("Players", OnExited)
 Players.PlayerAdded:Connect(OnPlayerAdded)
 
+Boundaries.EnableCollisionDetection()
 for _, Player in Players:GetPlayers() do
 	task.spawn(OnPlayerAdded, Player)
 end
-for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
-	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+for _, Part in Folder:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(Part)
 	Boundary:TrackGroups("Players")
 end
 ```
@@ -163,50 +175,37 @@ end
 <details>
 <summary>Client</summary>
 	
-```luau
+```lua
+--!strict
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Boundaries = require(PATH_TO_BOUNDARIES)
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+
+local Boundaries = require(ReplicatedStorage.Boundaries)
+
+local Folder = workspace:WaitForChild("Folder")
+
+local function OnEntered(Boundary, TrackedPart, CallbackData)
+	-- TrackedPart has entered Boundary with CallbackData.
+end
+local function OnExited(Boundary, TrackedPart, CallbackData)
+	-- TrackedPart has exited Boundary with CallbackData.
+end
+
+local Connection_1 = Boundaries.OnEntered("Players", OnEntered)
+local Connection_2 = Boundaries.OnExited("Players", OnExited)
+
 Boundaries.EnableCollisionDetection()
-
-local function OnPlayerAdded(Player: Player)
-	local function OnCharacterAdded(Character: Model)
-		local Highlight: Highlight = Instance.new("Highlight")
-		Highlight.FillTransparency = 1
-		Highlight.Parent = Character
-		local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
-		Boundaries.TrackPart(HumanoidRootPart, {"Players"}, Player)
-	end
-	Player.CharacterAdded:Connect(OnCharacterAdded)
-	if Player.Character ~= nil then
-		OnCharacterAdded(Player.Character)
-	end
-end
-
-Boundaries.OnEntered("Players", function(Boundary, TrackedPart, CallbackData)
-	local Character = TrackedPart.Parent
-	if Character == nil then return end
-	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
-	if Highlight == nil then return end
-	Highlight.OutlineColor = Boundary.Part and Boundary.Part.Color or Color3.fromRGB(255, 255, 255)
-end)
-Boundaries.OnExited("Players", function(Boundary, TrackedPart, CallbackData)
-	local Character = TrackedPart.Parent
-	if Character == nil then return end
-	local Highlight = Character:FindFirstChildWhichIsA("Highlight")
-	if Highlight == nil then return end
-	Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-end)
-
-Players.PlayerAdded:Connect(OnPlayerAdded)
-
-for _, Player in Players:GetPlayers() do
-	task.spawn(OnPlayerAdded, Player)
-end
-for _, BoundaryPart in workspace.PATH_TO_FOLDER:GetChildren() do
-	local Boundary = Boundaries.CreateBoundaryFromPart(BoundaryPart)
+Boundaries.TrackPart(Character:WaitForChild("HumanoidRootPart"), {"Players"}, Player)
+for _, Part in Folder:GetChildren() do
+	local Boundary = Boundaries.CreateBoundaryFromPart(Part)
 	Boundary:TrackGroups("Players")
 end
+
+-- Later when you want to disconnect whichever callback...
+Connection_1()
 ```
 </details>
 
