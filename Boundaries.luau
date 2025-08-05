@@ -1,28 +1,28 @@
 --!strict
 --!native
 --!optimize 2
--- @c6h15, Boundaries v1.2.0 - https://github.com/C6H15/Boundaries
+-- @c6h15, Boundaries v1.2.1 - https://github.com/C6H15/Boundaries
 -- Inspired by QuickBounds by @unityjaeger.
-type _Shape = "Block" | "Ball" | "Complex"
+export type _Shape = "Block" | "Ball" | "Complex"
 type _Presences = { [number]: boolean }
 type _RegisteredPart = {
 	CallbackData: { [string]: any },
 	Groups: { [string]: _Presences }, -- Part is in the group if it's not nil and also can check the boundaries they're in.
 	Connection: RBXScriptConnection,
 }
-type _EnterExitCallback = (Boundary: _Boundary, TrackedPart: BasePart, CallbackData: any) -> ()
+export type _EnterExitCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()
 type _GroupCallbacks = {
 	Entered: {_EnterExitCallback},
 	Exited: {_EnterExitCallback},
 }
-type _CreatedBoundary = {
+export type _Boundary = {
 	IsDestroyed: boolean,
 	Index: number,
-	TrackGroups: (CreatedBoundary: _CreatedBoundary, ...string) -> (),
-	UntrackGroups: (CreatedBoundary: _CreatedBoundary, ...string) -> (),
-	Destroy: (CreatedBoundary: _CreatedBoundary) -> (),
+	TrackGroups: (CreatedBoundary: _Boundary, ...string) -> (),
+	UntrackGroups: (CreatedBoundary: _Boundary, ...string) -> (),
+	Destroy: (CreatedBoundary: _Boundary) -> (),
 }
-type _Boundary = {
+export type _BoundaryProperties = {
 	Name: string,
 	Shape: _Shape,
 	CFrame: CFrame,
@@ -54,7 +54,7 @@ local ComplexOverlapParams: OverlapParams = nil
 local LastPart: BasePart? = nil
 
 local Boundaries = {}
-local BoundaryData: { [number]: _Boundary }, BoundaryGaps: {number} = {}, {}
+local BoundaryData: { [number]: _BoundaryProperties }, BoundaryGaps: {number} = {}, {}
 local BoundaryCallbacks: { [string]: _GroupCallbacks }, BoundaryGroups: { [number]: {string} } = {}, {}
 local RegisteredParts: { [BasePart]: _RegisteredPart } = {}
 local CurrentBoundaries: {number}, CurrentPresences: _Presences = {}, {}
@@ -68,7 +68,7 @@ local function SpreadBits(Value: number): number
 	Value = bit32.band(bit32.bor(Value, bit32.lshift(Value, 2)), 0x9249249)
 	return Value
 end
-local function CalculateAABB(Boundary: _Boundary): (Vector3, Vector3)
+local function CalculateAABB(Boundary: _BoundaryProperties): (Vector3, Vector3)
 	local Center = Boundary.Position
 	local HalfSize = Boundary.HalfSize
 	local CF = Boundary.CFrame
@@ -146,7 +146,7 @@ local function CreateBVH(): _BVHNode?
 	end)
 	return CreateBVHNode(1, #BVHItems, BoundaryMinBounds, BoundaryMaxBounds, BVHItems)
 end
-local function InsertBoundary(Boundary: _Boundary): number
+local function InsertBoundary(Boundary: _BoundaryProperties): number
 	local Output: number
 	if #BoundaryGaps > 0 then
 		local Index = table.remove(BoundaryGaps, 1) :: number
@@ -158,7 +158,7 @@ local function InsertBoundary(Boundary: _Boundary): number
 	end
 	return Output
 end
-local function TrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
+local function TrackGroups(CreatedBoundary: _Boundary, ...: string)
 	if CreatedBoundary.IsDestroyed then return end
 	local Groups = BoundaryGroups[CreatedBoundary.Index]
 	if Groups == nil then return end
@@ -168,7 +168,7 @@ local function TrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
 		if table.find(Groups, Group) == nil then table.insert(Groups, Group) end
 	end
 end
-local function UntrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
+local function UntrackGroups(CreatedBoundary: _Boundary, ...: string)
 	if CreatedBoundary.IsDestroyed then return end
 	local Groups = BoundaryGroups[CreatedBoundary.Index]
 	if Groups == nil then return end
@@ -178,7 +178,7 @@ local function UntrackGroups(CreatedBoundary: _CreatedBoundary, ...: string)
 		if Index ~= nil then table.remove(Groups, Index) end
 	end
 end
-local function Destroy(CreatedBoundary: _CreatedBoundary)
+local function Destroy(CreatedBoundary: _Boundary)
 	if CreatedBoundary.IsDestroyed then return end
 	CreatedBoundary.IsDestroyed = true
 	local Index = CreatedBoundary.Index
@@ -200,7 +200,7 @@ local function RemoveRegisteredPart(Part: BasePart)
 	RegisteredParts[Part].Connection:Disconnect()
 	RegisteredParts[Part] = nil
 end
-local function PointInBoundary(Boundary: _Boundary, Part: BasePart): boolean
+local function PointInBoundary(Boundary: _BoundaryProperties, Part: BasePart): boolean
 	local Position: Vector3 = Part.Position
 	if Boundary.Shape == "Block" then
 		local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
@@ -308,7 +308,7 @@ function Boundaries.SetFrameBudgetMillis(Value: number)
 	if type(Value) == "number" then FrameBudget = Value / 1000 end
 end
 -- Boundaries
-function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): _CreatedBoundary
+function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): _Boundary
 	if type(Shape) ~= "string" then
 		error("Shape must be a string.", 2)
 	elseif type(Name) ~= "string" then
@@ -320,7 +320,7 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 	elseif Part ~= nil and (typeof(Part) ~= "Instance" or not Part:IsA("BasePart")) then
 		error("Part must be a BasePart.", 2)
 	end
-	local Boundary: _Boundary = {
+	local Boundary: _BoundaryProperties = {
 		["Name"] = Name,
 		["Shape"] = Shape,
 		["CFrame"] = CF,
@@ -352,7 +352,7 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 		["Destroy"] = Destroy,
 	}
 end
-function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _CreatedBoundary
+function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _Boundary
 	if typeof(Part) ~= "Instance" then error("Part isn't an Instance.", 2) end
 	local Shape: _Shape
 	if Part:IsA("Part") then
@@ -407,7 +407,7 @@ end
 function Boundaries.UntrackPart(Part: BasePart)
 	if RegisteredParts[Part] ~= nil then RemoveRegisteredPart(Part) end
 end
-function Boundaries.GetBoundariesContainingPart(Part: BasePart): {_Boundary}
+function Boundaries.GetBoundariesContainingPart(Part: BasePart): {_BoundaryProperties}
 	local PartBoundaries = {}
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart ~= nil then
