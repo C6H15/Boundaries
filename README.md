@@ -7,6 +7,10 @@ Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6
 ```lua
 "Block" | "Ball" | "Complex"
 ```
+### EnterExitCallback
+```luau
+(Boundary: BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()
+```
 ### Boundary
 ```lua
 {
@@ -30,6 +34,8 @@ Grab the `.rbxm` standalone file from the latest [release](https://github.com/C6
 	Radius: number?,
 }
 ```
+> [!NOTE]
+> Type declarations are prefixed with an underscore internally (e.g., _BoundaryProperties, _Boundary, and others) to distinguish them from other variables. This is a personal preference to make types visually distinct. It's been removed from the documentation to avoid confusion.
 
 ## Functions
 ### Boundaries.EnableCollisionDetection()
@@ -187,15 +193,15 @@ local Boundaries = require(ReplicatedStorage.Boundaries)
 
 local Folder = workspace:WaitForChild("Folder")
 
-local function OnEntered(Boundary, TrackedPart, CallbackData)
+local function OnEntered(Boundary: Boundaries._BoundaryProperties, TrackedPart: BasePart, CallbackData: any)
 	-- TrackedPart has entered Boundary with CallbackData.
 end
-local function OnExited(Boundary, TrackedPart, CallbackData)
+local function OnExited(Boundary: Boundaries._BoundaryProperties, TrackedPart: BasePart, CallbackData: any)
 	-- TrackedPart has exited Boundary with CallbackData.
 end
 
-local Connection_1 = Boundaries.OnEntered("Players", OnEntered)
-local Connection_2 = Boundaries.OnExited("Players", OnExited)
+local Connection_One = Boundaries.OnEntered("Players", OnEntered)
+local Connection_Two = Boundaries.OnExited("Players", OnExited)
 
 Boundaries.EnableCollisionDetection()
 Boundaries.TrackPart(Character:WaitForChild("HumanoidRootPart"), {"Players"}, Player)
@@ -204,8 +210,8 @@ for _, Part in Folder:GetChildren() do
 	Boundary:TrackGroups("Players")
 end
 
--- Later when you want to disconnect whichever callback...
-Connection_1()
+-- Later when you want to disconnect a callback...
+Connection_One()
 ```
 </details>
 
