@@ -2,19 +2,9 @@
 --!native
 --!optimize 2
 -- @c6h15, Boundaries v1.2.1 - https://github.com/C6H15/Boundaries
--- Inspired by QuickBounds by @unityjaeger.
+-- Inspired by QuickBounds (@unityjaeger).
 export type _Shape = "Block" | "Ball" | "Complex"
-type _Presences = { [number]: boolean }
-type _RegisteredPart = {
-	CallbackData: { [string]: any },
-	Groups: { [string]: _Presences }, -- Part is in the group if it's not nil and also can check the boundaries they're in.
-	Connection: RBXScriptConnection,
-}
 export type _EnterExitCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()
-type _GroupCallbacks = {
-	Entered: {_EnterExitCallback},
-	Exited: {_EnterExitCallback},
-}
 export type _Boundary = {
 	IsDestroyed: boolean,
 	Index: number,
@@ -31,6 +21,16 @@ export type _BoundaryProperties = {
 	Part: BasePart?,
 	-- Ball
 	Radius: number?,
+}
+type _Presences = { [number]: boolean }
+type _RegisteredPart = {
+	CallbackData: { [string]: any },
+	Groups: { [string]: _Presences }, -- Part is in the group if it's not nil and also can check the boundaries they're in.
+	Connection: RBXScriptConnection,
+}
+type _GroupCallbacks = {
+	Entered: {_EnterExitCallback},
+	Exited: {_EnterExitCallback},
 }
 type _BVHItem = {
 	Index: number,
@@ -56,8 +56,8 @@ local LastPart: BasePart? = nil
 local Boundaries = {}
 local BoundaryData: { [number]: _BoundaryProperties }, BoundaryGaps: {number} = {}, {}
 local BoundaryCallbacks: { [string]: _GroupCallbacks }, BoundaryGroups: { [number]: {string} } = {}, {}
-local RegisteredParts: { [BasePart]: _RegisteredPart } = {}
 local CurrentBoundaries: {number}, CurrentPresences: _Presences = {}, {}
+local RegisteredParts: { [BasePart]: _RegisteredPart } = {}
 local BVHRoot: _BVHNode? = nil
 
 local function SpreadBits(Value: number): number
