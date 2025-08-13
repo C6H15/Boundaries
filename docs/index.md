@@ -8,7 +8,7 @@ hero:
   actions:
     - theme: brand
       text: Get Started →
-      link: /markdown-examples
+      link: /guide/introduction
     - theme: alt
       text: GitHub
       link: https://github.com/C6H15/Boundaries
