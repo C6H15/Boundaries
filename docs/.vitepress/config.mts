@@ -4,7 +4,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Boundaries",
   description: "Dynamic spatial boundaries for Roblox using BVH with Morton codes for efficient collision detection.",
-
+  base: "/Boundaries/",
   lastUpdated: true,
 
   themeConfig: {
