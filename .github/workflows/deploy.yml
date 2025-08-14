@@ -2,7 +2,7 @@ name: site-deploy
 
 on:
   push:
-    branches: [docs/vitepress] # [main]
+    branches: [main]
 
   workflow_dispatch:
 
