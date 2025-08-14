@@ -1,10 +1,11 @@
 --!strict
 --!native
 --!optimize 2
--- @c6h15, Boundaries v1.2.1 - https://github.com/C6H15/Boundaries
+-- @c6h15, Boundaries v1.3.0 - https://github.com/C6H15/Boundaries
 -- Inspired by QuickBounds (@unityjaeger).
 export type _Shape = "Block" | "Ball" | "Complex"
-export type _EnterExitCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any) -> ()
+export type _EnteredCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any, IsFirstBoundary: boolean) -> ()
+export type _ExitedCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any, IsLastBoundary: boolean) -> ()
 export type _Boundary = {
 	IsDestroyed: boolean,
 	Index: number,
@@ -29,8 +30,8 @@ type _RegisteredPart = {
 	Connection: RBXScriptConnection,
 }
 type _GroupCallbacks = {
-	Entered: {_EnterExitCallback},
-	Exited: {_EnterExitCallback},
+	Entered: {_EnteredCallback},
+	Exited: {_ExitedCallback},
 }
 type _BVHItem = {
 	Index: number,
@@ -255,6 +256,8 @@ local function OnPostSimulation(DeltaTime: number)
 					CurrentPresences[Index] = true
 				end
 			end
+			local IsFirstBoundary: boolean = #LastPresences <= 0
+			local IsLastBoundary: boolean = #CurrentPresences <= 0
 			-- Exited
 			for Index, Inside in LastPresences do
 				if Inside and not CurrentPresences[Index] then
@@ -262,7 +265,7 @@ local function OnPostSimulation(DeltaTime: number)
 					local GroupCallbacks = BoundaryCallbacks[Group]
 					if Boundary == nil or GroupCallbacks == nil then continue end
 					for _, Callback in GroupCallbacks.Exited do
-						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData)
+						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsLastBoundary)
 					end
 				end
 			end
@@ -273,7 +276,7 @@ local function OnPostSimulation(DeltaTime: number)
 				local GroupCallbacks = BoundaryCallbacks[Group]
 				if Boundary == nil or GroupCallbacks == nil then continue end
 				for _, Callback in GroupCallbacks.Entered do
-					task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData)
+					task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsFirstBoundary)
 				end
 			end
 			table.clear(LastPresences)
@@ -456,7 +459,7 @@ function Boundaries.GetPartGroups(Part: BasePart): {string}
 	return PartGroups
 end
 -- Callbacks
-function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -> ()
+function Boundaries.OnEntered(Group: string, Callback: _EnteredCallback): () -> ()
 	local GroupCallbacks = BoundaryCallbacks[Group]
 	local Index: number
 	if GroupCallbacks == nil then
@@ -477,7 +480,7 @@ function Boundaries.OnEntered(Group: string, Callback: _EnterExitCallback): () -
 		end
 	end
 end
-function Boundaries.OnExited(Group: string, Callback: _EnterExitCallback): () -> ()
+function Boundaries.OnExited(Group: string, Callback: _ExitedCallback): () -> ()
 	local GroupCallbacks = BoundaryCallbacks[Group]
 	local Index: number
 	if GroupCallbacks == nil then
