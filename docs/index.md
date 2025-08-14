@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: Boundaries
-  text: Spatial boundaries for Roblox using BVH with Morton codes.
+  tagline: Spatial boundaries for Roblox using BVH with Morton codes.
   actions:
     - theme: brand
       text: Get Started →
