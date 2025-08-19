@@ -391,7 +391,7 @@ function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: an
 					local Boundary = BoundaryData[Index]
 					if not Inside or Boundary == nil then continue end
 					for _, Callback in GroupCallbacks.Exited do
-						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData)
+						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, true)
 					end
 				end
 			end
