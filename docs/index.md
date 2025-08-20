@@ -7,7 +7,7 @@ hero:
   tagline: Spatial boundaries for Roblox using BVH with Morton codes.
   actions:
     - theme: brand
-      text: Get Started →
+      text: Explore →
       link: /guide/introduction
     - theme: alt
       text: GitHub

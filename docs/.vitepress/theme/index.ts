@@ -1,7 +1,8 @@
 // https://vitepress.dev/guide/custom-theme
 import { h } from 'vue'
 import type { Theme } from 'vitepress'
-import DefaultTheme from 'vitepress/theme'
+import DefaultTheme, { VPButton } from 'vitepress/theme'
+import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
 import './style.css'
 
 export default {
@@ -12,6 +13,7 @@ export default {
     })
   },
   enhanceApp({ app, router, siteData }) {
-    // ...
+    enhanceAppWithTabs(app),
+    app.component("VPButton", VPButton)
   }
 } satisfies Theme
