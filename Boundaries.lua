@@ -212,6 +212,8 @@ local function PointInBoundary(Boundary: _BoundaryProperties, Part: BasePart): b
 		local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
 		if vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition then
 			ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part}
+			-- Batching per boundary instead of per part was worse.
+			-- Not the most optimal approach but isn't too much of a problem either.
 			return #workspace:GetPartsInPart(Part, ComplexOverlapParams) > 0
 		end
 	end
