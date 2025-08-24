@@ -209,12 +209,10 @@ local function PointInBoundary(Boundary: _BoundaryProperties, Part: BasePart): b
 	elseif Boundary.Shape == "Ball" then
 		return vector.magnitude(Boundary.Position - Position) <= Boundary.Radius :: number
 	elseif Boundary.Shape == "Complex" then
-		if Boundary.Part ~= nil then
-			local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
-			if vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition then
-				ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part}
-				return #workspace:GetPartsInPart(Part, ComplexOverlapParams) > 0
-			end
+		local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
+		if vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition then
+			ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part}
+			return #workspace:GetPartsInPart(Part, ComplexOverlapParams) > 0
 		end
 	end
 	return false
@@ -332,13 +330,10 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 		["Part"] = Part,
 	}
 	if Shape == "Ball" then
-		if Size.X ~= Size.Y or Size.Y ~= Size.Z then
-			error(`{Name} ({Shape}) must have equal dimensions.`, 2)
-		end
+		if Size.X ~= Size.Y or Size.Y ~= Size.Z then error(`{Name} ({Shape}) must have equal dimensions.`, 2) end
 		Boundary.Radius = Boundary.HalfSize.Y
 	elseif Shape == "Complex" then
-		if Part == nil then error("Complex shape requires an associated part.", 2) end
-		Part.CanQuery = true
+		if Part == nil then error("Complex shape requires an associated part.", 2) else Part.CanQuery = true end
 		if ComplexOverlapParams == nil then
 			ComplexOverlapParams = OverlapParams.new()
 			ComplexOverlapParams.FilterType = Enum.RaycastFilterType.Include
@@ -437,15 +432,13 @@ function Boundaries.UnassignGroups(Part: BasePart, ...: string)
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
 	local GroupCount: number = select("#", ...)
-	for i = 1, GroupCount do
-		RegisteredPart.Groups[select(i, ...)] = nil
-	end
+	for i = 1, GroupCount do RegisteredPart.Groups[select(i, ...)] = nil end
 end
 function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean
-	local GroupCount: number = select("#", ...)
-	if GroupCount == 0 then return false end
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return false end
+	local GroupCount: number = select("#", ...)
+	if GroupCount == 0 then return false end
 	local Output: {boolean} = {}
 	for i = 1, GroupCount do Output[i] = RegisteredPart.Groups[select(i, ...)] ~= nil end
 	return table.unpack(Output)
@@ -475,9 +468,8 @@ function Boundaries.OnEntered(Group: string, Callback: _EnteredCallback): () -> 
 		GroupCallbacks = BoundaryCallbacks[Group]
 		if GroupCallbacks == nil then return end
 		GroupCallbacks.Entered[Index] = nil
-		if #GroupCallbacks.Entered + #GroupCallbacks.Exited == 0 then
-			BoundaryCallbacks[Group] = nil
-		end
+		if #GroupCallbacks.Entered + #GroupCallbacks.Exited ~= 0 then return end
+		BoundaryCallbacks[Group] = nil
 	end
 end
 function Boundaries.OnExited(Group: string, Callback: _ExitedCallback): () -> ()
@@ -496,9 +488,8 @@ function Boundaries.OnExited(Group: string, Callback: _ExitedCallback): () -> ()
 		GroupCallbacks = BoundaryCallbacks[Group]
 		if GroupCallbacks == nil then return end
 		GroupCallbacks.Exited[Index] = nil
-		if #GroupCallbacks.Exited + #GroupCallbacks.Entered == 0 then
-			BoundaryCallbacks[Group] = nil
-		end
+		if #GroupCallbacks.Exited + #GroupCallbacks.Entered ~= 0 then return end
+		BoundaryCallbacks[Group] = nil
 	end
 end
 
