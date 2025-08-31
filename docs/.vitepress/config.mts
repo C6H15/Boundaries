@@ -9,6 +9,8 @@ export default defineConfig({
   lastUpdated: true,
   cleanUrls: true,
 
+  head: [["link", { rel: "icon", href: "/Boundaries/" }]], // /Boundaries/favicon.ico
+
   markdown: {
     lineNumbers: true,
     config(md) {

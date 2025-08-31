@@ -1,8 +1,12 @@
+---
+outline: 2
+---
+
 # Types {#1}
 ::: info Syntax
 Type declarations are internally prefixed with an underscore `_` to distinguish them from other variables. When importing, use the underscore:
 ```luau:no-line-numbers
-type Boundary = Module._Boundary
+type Boundary = Boundaries._Boundary
 ```
 :::
 
@@ -29,6 +33,8 @@ type Boundary = Module._Boundary
 - `TrackGroups` - Assigns the boundary to one or more groups.
 - `UntrackGroups` - Unassigns the boundary from one or more groups.
 - `Destroy` - Removes the boundary and frees up resources.
+> [!NOTE] Boundary Part Removal
+> Upon destroying a boundary, any associated part will remain. You must manually destroy the part if you want it removed. This only applies if you supplied a part when creating a boundary.
 
 ## _BoundaryProperties
 ```luau:no-line-numbers
@@ -50,7 +56,7 @@ type Boundary = Module._Boundary
 - `Position` - The 3D position of the boundary.
 - `HalfSize` - The boundary's given size in half.
 - `Part` - Associated `BasePart` of the boundary, `nil` if unspecified.
-- `Radius` - The extents from center to edge, only for `Ball` shapes.
+- `Radius` - The extents from center to edge for spherical shapes.
 
 ## _EnteredCallback
 ```luau:no-line-numbers

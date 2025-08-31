@@ -20,15 +20,15 @@ const members = [
 Boundaries is a Roblox module for efficient 3D collision detection and spatial boundary management. It uses [Bounding Volume Hierarchy (BVH)](https://en.wikipedia.org/wiki/Bounding_volume_hierarchy) and [Morton codes](https://en.wikipedia.org/wiki/Z-order_curve) to provide fast and reliable detection, allowing you to create spatial areas in your Roblox experience to track parts within boundaries.
 
 > [!NOTE] Project Inspiration
-> This project was inspired by [QuickBounds](https://github.com/unityjaeger/QuickBounds) by [@unityjaeger](https://github.com/unityjaeger). Some mathematical approaches are based on their work. This project was created from scratch to address limitations in their project's design, improve performance, and reduce memory usage. If you're interested in the benchmarks, head to [Performance](/resources/performance) under Resources.
+> This project was inspired by [QuickBounds](https://github.com/unityjaeger/QuickBounds) by [@unityjaeger](https://github.com/unityjaeger). This project was created from scratch to address limitations in their project's design, improve performance, and reduce memory usage. If you're interested in the benchmarks, head to [Performance](/resources/performance) under Resources.
 
 ## Use Cases
 - **Player Interactions**:<br>
-PvP/PvE areas, safe zones, motion sensors, and NPC dialogue triggers.
+PvP and PvE areas, safe zones, motion sensors, and NPC dialogue triggers.
 - **Game Mechanics**:<br>
 Quest checkpoints, item drop-off and pickup areas, and cutscene triggers.
 - **World Systems**:<br>
-Weather and lighting transitions, ambient SFX/VFX, and environmental triggers.
+Weather and lighting transitions, ambient SFX and VFX, and environmental triggers.
 
 <div class="tip custom-block" style="padding-top: 8px;">
 

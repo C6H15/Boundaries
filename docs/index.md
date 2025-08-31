@@ -19,7 +19,7 @@ features:
   - title: Boundary Groups
     details: Set each boundary to only track specific groups, allowing control over which parts trigger collision callbacks.
   - title: Part Groups
-    details: Organize parts into groups with entered/exited callbacks that receive custom data for flexible collision handling.
+    details: Organize parts into groups with entered and exited callbacks that receive custom data for flexible collision handling.
   - title: Budgeted Processing
     details: Frame-budgeted processing with BVH and Morton codes to maintain consistent performance.
 ---

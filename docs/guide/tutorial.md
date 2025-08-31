@@ -5,7 +5,7 @@ next:
 ---
 
 # Tutorial {#1}
-This tutorial will guide you through a basic implementation of Boundaries. By the end of this tutorial, you should have a good understanding of how boundaries are created and track parts for collision detection.
+This tutorial will guide you through a basic implementation of Boundaries. By the end of this tutorial, you should have a good understanding of how boundaries are created to track parts.
 
 ## Prerequisites
 - A basic understanding of [Luau](https://create.roblox.com/docs/luau)
@@ -13,8 +13,8 @@ This tutorial will guide you through a basic implementation of Boundaries. By th
 
 ## Basic Usage
 
-> [!IMPORTANT] Prerequisite Notice
-> It is assumed you know the basics of Luau scripting to follow along. Not all functions/methods in the [API](/api/functions) will be covered.
+> [!IMPORTANT] Tutorial Coverage
+> Not all functions and methods in the [API](/api/functions) will be covered.
 
 ### Create a Boundary
 You can create a boundary by using `.CreateBoundaryFromPart()`. This function takes an existing `BasePart` and an optional name to set the boundary's name, otherwise defaulting to the given part's name.
@@ -49,9 +49,6 @@ If you no longer need a boundary, use the `:Destroy()` method to clean it up. Su
 Boundary:Destroy()
 ```
 
-> [!NOTE] Boundary Part Removal
-> Upon destroying a boundary, any associated part will remain. You must manually destroy the part if you want it removed. This only applies if you supplied a part when creating a boundary.
-
 ### Track a Part
 To detect a part use the `.TrackPart()` function which will register it for collision calculations. A `BasePart` and string array must be passed with an optional custom data for the last argument. Use `.UntrackPart()` to deregister a tracked part.
 ```luau{8-9}
@@ -72,11 +69,8 @@ for _, Player in Players:GetPlayers() do
 end
 ```
 
-> [!NOTE] Tracked Part Removal
-> Tracked parts are automatically untracked when destroyed, so manual cleanup isn't necessary. If the part is inside a boundary during automatic removal, the exited callback will be triggered (see [Set Up Callbacks](#set-up-callbacks) below).
-
 ### Set Up Callbacks
-You have to define callbacks to handle collisions that are detected using `.OnEntered()` and `.OnExited()` functions. Pass the group you want to handle along with the callback function as arguments. Both functions have a boolean flag as the last parameter, indicating whether or not it's the part's first/last boundary group. This helps distinguish between moving within a group boundary to entering/exiting group boundaries entirely.
+You have to define callbacks to handle collisions that are detected using `.OnEntered()` and `.OnExited()` functions. Pass the group you want to handle along with the callback function as arguments. Both functions have a boolean flag as the last parameter, indicating whether or not it's the part's first and last boundary group. This helps distinguish between moving within a group boundary to entering and exiting group boundaries entirely.
 ```luau
 for _, Player in Players:GetPlayers() do
 	task.spawn(OnPlayerAdded, Player)
@@ -102,7 +96,7 @@ end)
 Boundaries.EnableCollisionDetection() -- [!code focus:2]
 --Boundaries.DisableCollisionDetection()
 ```
-Run the script to see the output. It should print messages as you walk in/out of the boundary.
+Run the script to see the output. You can also copy and paste the script provided below. It should print messages as you walk in and out of the boundary.
 
 ::: details Basic Usage Script
 ```luau
