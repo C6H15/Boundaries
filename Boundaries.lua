@@ -1,8 +1,9 @@
 --!strict
 --!native
 --!optimize 2
--- @c6h15, Boundaries v1.3.0 - https://github.com/C6H15/Boundaries
--- Inspired by QuickBounds (@unityjaeger).
+-- Boundaries v1.3.1
+-- https://github.com/C6H15/Boundaries
+-- Inspired by QuickBounds (@unityjaeger)
 export type _Shape = "Block" | "Ball" | "Complex"
 export type _EnteredCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any, IsFirstBoundary: boolean) -> ()
 export type _ExitedCallback = (Boundary: _BoundaryProperties, TrackedPart: BasePart, CallbackData: any, IsLastBoundary: boolean) -> ()
@@ -20,13 +21,14 @@ export type _BoundaryProperties = {
 	Position: Vector3,
 	HalfSize: Vector3,
 	Part: BasePart?,
-	-- Ball
+	-- Ball Properties
 	Radius: number?,
 }
 type _Presences = { [number]: boolean }
+type _RegisteredPartGroups = { [string]: {LastPresences: _Presences, Count: number} }
 type _RegisteredPart = {
 	CallbackData: { [string]: any },
-	Groups: { [string]: _Presences }, -- Part is in the group if it's not nil and also can check the boundaries they're in.
+	Groups: _RegisteredPartGroups, -- In group if non-nil and presence indicates the boundary it's in.
 	Connection: RBXScriptConnection,
 }
 type _GroupCallbacks = {
@@ -49,15 +51,20 @@ local RunService = game:GetService("RunService")
 
 local OutdatedBVH: boolean = false
 local FrameBudget: number = 0.0002
+local LastPresencesCount: number = nil
+local CurrentPresencesCount: number = nil
 
 local PostSimulationConnection: RBXScriptConnection? = nil
 local ComplexOverlapParams: OverlapParams = nil
 local LastPart: BasePart? = nil
 
 local Boundaries = {}
-local BoundaryData: { [number]: _BoundaryProperties }, BoundaryGaps: {number} = {}, {}
-local BoundaryCallbacks: { [string]: _GroupCallbacks }, BoundaryGroups: { [number]: {string} } = {}, {}
-local CurrentBoundaries: {number}, CurrentPresences: _Presences = {}, {}
+local BoundaryData: { [number]: _BoundaryProperties } = {}
+local BoundaryGaps: {number} = {}
+local BoundaryCallbacks: { [string]: _GroupCallbacks } = {}
+local BoundaryGroups: { [number]: {string} } = {}
+local CurrentBoundaries: {number} = {}
+local CurrentPresences: _Presences = {}
 local RegisteredParts: { [BasePart]: _RegisteredPart } = {}
 local BVHRoot: _BVHNode? = nil
 
@@ -197,8 +204,20 @@ local function Destroy(CreatedBoundary: _Boundary)
 	OutdatedBVH = true
 end
 local function RemoveRegisteredPart(Part: BasePart)
-	if RegisteredParts[Part] == nil then return end
-	RegisteredParts[Part].Connection:Disconnect()
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart == nil then return end
+	for Group, Presences in RegisteredPart.Groups do
+		local GroupCallbacks = BoundaryCallbacks[Group]
+		if GroupCallbacks == nil then continue end
+		for Index, Inside in Presences do
+			local Boundary = BoundaryData[Index]
+			if not Inside or Boundary == nil then continue end
+			for _, Callback in GroupCallbacks.Exited do
+				task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, true)
+			end
+		end
+	end
+	RegisteredPart.Connection:Disconnect()
 	RegisteredParts[Part] = nil
 end
 local function PointInBoundary(Boundary: _BoundaryProperties, Part: BasePart): boolean
@@ -211,9 +230,8 @@ local function PointInBoundary(Boundary: _BoundaryProperties, Part: BasePart): b
 	elseif Boundary.Shape == "Complex" then
 		local LocalPosition = vector.abs(Boundary.CFrame:PointToObjectSpace(Position))
 		if vector.min(LocalPosition, Boundary.HalfSize) == LocalPosition then
-			ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part}
-			-- Batching per boundary instead of per part was worse.
-			-- Not the most optimal approach but isn't too much of a problem either.
+			-- Querying for each part isn't optimal, but it's better than querying the entire boundary even if batched.
+			ComplexOverlapParams.FilterDescendantsInstances = {Boundary.Part :: BasePart} -- Inserting into an existing table won't work.
 			return #workspace:GetPartsInPart(Part, ComplexOverlapParams) > 0
 		end
 	end
@@ -237,65 +255,60 @@ local function OnPostSimulation(DeltaTime: number)
 	end
 	if BVHRoot == nil then return end
 	local TotalTime: number = 0
-	--local PartCount: number = 0 -- Only for testing.
 	while TotalTime < FrameBudget do
 		local Part, RegisteredPart = next(RegisteredParts, LastPart)
 		if Part == nil then LastPart = nil break end
-		--PartCount += 1 -- Only for testing.
 		LastPart = Part
 		table.clear(CurrentBoundaries)
 		local QueryStartTime: number = os.clock()
 		QueryBoundaries(BVHRoot, Part, function(Index)
 			table.insert(CurrentBoundaries, Index)
 		end)
-		for Group, LastPresences in RegisteredPart.Groups do
+		for Group, PartGroups in RegisteredPart.Groups do
+			local LastPresences = PartGroups.LastPresences
 			table.clear(CurrentPresences)
+			CurrentPresencesCount = 0
 			for _, Index in CurrentBoundaries do
 				local Groups = BoundaryGroups[Index]
 				if Groups ~= nil and table.find(Groups, Group) ~= nil then
 					CurrentPresences[Index] = true
+					CurrentPresencesCount += 1
 				end
 			end
-			local IsFirstBoundary: boolean = #LastPresences <= 0
-			local IsLastBoundary: boolean = #CurrentPresences <= 0
-			-- Exited
-			for Index, Inside in LastPresences do
-				if Inside and not CurrentPresences[Index] then
+			local GroupCallbacks = BoundaryCallbacks[Group]
+			if GroupCallbacks ~= nil then
+				LastPresencesCount = PartGroups.Count or 0
+				local IsFirstBoundary: boolean = LastPresencesCount <= 0
+				local IsLastBoundary: boolean = CurrentPresencesCount <= 0
+				-- Exited
+				for Index, Inside in LastPresences do
+					if Inside and not CurrentPresences[Index] then
+						local Boundary = BoundaryData[Index]
+						if Boundary == nil then continue end
+						for _, Callback in GroupCallbacks.Exited do
+							task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsLastBoundary)
+						end
+					end
+				end
+				-- Entered
+				for Index, _ in CurrentPresences do
+					if LastPresences[Index] then continue end
 					local Boundary = BoundaryData[Index]
-					local GroupCallbacks = BoundaryCallbacks[Group]
-					if Boundary == nil or GroupCallbacks == nil then continue end
-					for _, Callback in GroupCallbacks.Exited do
-						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsLastBoundary)
+					if Boundary == nil then continue end
+					for _, Callback in GroupCallbacks.Entered do
+						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsFirstBoundary)
 					end
 				end
 			end
-			-- Entered
-			for Index, _ in CurrentPresences do
-				if LastPresences[Index] then continue end
-				local Boundary = BoundaryData[Index]
-				local GroupCallbacks = BoundaryCallbacks[Group]
-				if Boundary == nil or GroupCallbacks == nil then continue end
-				for _, Callback in GroupCallbacks.Entered do
-					task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, IsFirstBoundary)
-				end
-			end
 			table.clear(LastPresences)
+			PartGroups.Count = CurrentPresencesCount
 			for Index, _ in CurrentPresences do
 				LastPresences[Index] = true
 			end
 		end
 		TotalTime += os.clock() - QueryStartTime
-		--if TotalTime >= FrameBudget then -- Only for testing.
-		--	warn(string.format("Frame budget exceeded after %d parts. (%.4fms)", PartCount, TotalTime * 1000))
-		--end
 	end
-	--if LastPart == nil then -- Only for testing.
-	--	print(string.format("Completed 1 cycle: %d parts in %.4fms.", PartCount, TotalTime * 1000))
-	--else
-	--	print(string.format("Frame: %d parts in %.4fms.", PartCount, TotalTime * 1000))
-	--end
 end
--- Functions
 function Boundaries.EnableCollisionDetection()
 	if typeof(PostSimulationConnection) ~= "RBXScriptConnection" then
 		PostSimulationConnection = RunService.PostSimulation:Connect(OnPostSimulation)
@@ -310,7 +323,6 @@ end
 function Boundaries.SetFrameBudgetMillis(Value: number)
 	if type(Value) == "number" then FrameBudget = Value / 1000 end
 end
--- Boundaries
 function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size: Vector3, Part: BasePart?): _Boundary
 	if type(Shape) ~= "string" then
 		error("Shape must be a string.", 2)
@@ -330,16 +342,18 @@ function Boundaries.CreateBoundary(Shape: _Shape, Name: string, CF: CFrame, Size
 		["Position"] = CF.Position,
 		["HalfSize"] = Size / 2,
 		["Part"] = Part,
+		["Radius"] = nil,
 	}
 	if Shape == "Ball" then
 		if Size.X ~= Size.Y or Size.Y ~= Size.Z then error(`{Name} ({Shape}) must have equal dimensions.`, 2) end
 		Boundary.Radius = Boundary.HalfSize.Y
 	elseif Shape == "Complex" then
-		if Part == nil then error("Complex shape requires an associated part.", 2) else Part.CanQuery = true end
+		if Part == nil then error(`{Name} ({Shape}) must have a part specified.`, 2) end
 		if ComplexOverlapParams == nil then
 			ComplexOverlapParams = OverlapParams.new()
 			ComplexOverlapParams.FilterType = Enum.RaycastFilterType.Include
 		end
+		Part.CanQuery = true
 	end
 	local Index = InsertBoundary(Boundary)
 	BoundaryGroups[Index] = {}
@@ -362,7 +376,7 @@ function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _Boun
 		elseif PartType == Enum.PartType.Ball then
 			Shape = "Ball"
 		else
-			error(`{Part.Name} is an unsupported {PartType.Name}-shaped part.`)
+			error(`{Part.Name} is an unsupported {PartType.Name}-shaped part.`, 2)
 		end
 	elseif Part:IsA("UnionOperation") or Part:IsA("MeshPart") then
 		Shape = "Complex"
@@ -371,31 +385,23 @@ function Boundaries.CreateBoundaryFromPart(Part: BasePart, Name: string?): _Boun
 	end
 	return Boundaries.CreateBoundary(Shape, Name or Part.Name, Part.CFrame, Part.Size, Part)
 end
--- Parts
 function Boundaries.TrackPart(Part: BasePart, Groups: {string}, CallbackData: any)
 	local RegisteredPart = RegisteredParts[Part]
-	local GroupSet: { [string]: _Presences } = {}
+	local GroupSet: _RegisteredPartGroups = {}
 	for _, Group in Groups do
-		if type(Group) == "string" then GroupSet[Group] = {} end
+		if type(Group) == "string" then
+			GroupSet[Group] = {
+				["LastPresences"] = {},
+				["Count"] = 0,
+			}
+		end
 	end
 	if RegisteredPart == nil then
 		local function OnAncestryChanged(_, Parent: Instance)
-			if Parent ~= nil then return end
-			for Group, Presences in RegisteredPart.Groups do
-				local GroupCallbacks = BoundaryCallbacks[Group]
-				if GroupCallbacks == nil then continue end
-				for Index, Inside in Presences do
-					local Boundary = BoundaryData[Index]
-					if not Inside or Boundary == nil then continue end
-					for _, Callback in GroupCallbacks.Exited do
-						task.spawn(Callback, Boundary, Part, RegisteredPart.CallbackData, true)
-					end
-				end
-			end
-			RemoveRegisteredPart(Part)
+			if Parent == nil then RemoveRegisteredPart(Part) end
 		end
 		RegisteredPart = {
-			["CallbackData"] = CallbackData or Part,
+			["CallbackData"] = CallbackData,
 			["Groups"] = GroupSet,
 			["Connection"] = Part.AncestryChanged:Connect(OnAncestryChanged),
 		}
@@ -408,18 +414,8 @@ function Boundaries.UntrackPart(Part: BasePart)
 	if RegisteredParts[Part] ~= nil then RemoveRegisteredPart(Part) end
 end
 function Boundaries.GetBoundariesContainingPart(Part: BasePart): {_BoundaryProperties}
-	local PartBoundaries = {}
-	local RegisteredPart = RegisteredParts[Part]
-	if RegisteredPart ~= nil then
-		for _, Presences in RegisteredPart.Groups do
-			for Index, Inside in Presences do
-				if Inside then table.insert(PartBoundaries, BoundaryData[Index]) end
-			end
-		end
-	end
-	return PartBoundaries
+	-- TODO: Incomplete
 end
--- Part Groups
 function Boundaries.AssignGroups(Part: BasePart, ...: string)
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
@@ -434,26 +430,18 @@ function Boundaries.UnassignGroups(Part: BasePart, ...: string)
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
 	local GroupCount: number = select("#", ...)
-	for i = 1, GroupCount do RegisteredPart.Groups[select(i, ...)] = nil end
+	for i = 1, GroupCount do
+		local Group = select(i, ...)
+		if type(Group) ~= "string" then continue end
+		RegisteredPart.Groups[Group] = nil
+	end
 end
 function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean
-	local RegisteredPart = RegisteredParts[Part]
-	if RegisteredPart == nil then return false end
-	local GroupCount: number = select("#", ...)
-	if GroupCount == 0 then return false end
-	local Output: {boolean} = {}
-	for i = 1, GroupCount do Output[i] = RegisteredPart.Groups[select(i, ...)] ~= nil end
-	return table.unpack(Output)
+	-- TODO: Incomplete
 end
 function Boundaries.GetPartGroups(Part: BasePart): {string}
-	local PartGroups = {}
-	local RegisteredPart = RegisteredParts[Part]
-	if RegisteredPart ~= nil then
-		for i, _ in RegisteredPart.Groups do table.insert(PartGroups, i) end
-	end
-	return PartGroups
+	-- TODO: Incomplete
 end
--- Callbacks
 function Boundaries.OnEntered(Group: string, Callback: _EnteredCallback): () -> ()
 	local GroupCallbacks = BoundaryCallbacks[Group]
 	local Index: number
