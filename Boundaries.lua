@@ -196,8 +196,8 @@ local function Destroy(CreatedBoundary: _Boundary)
 	end
 	BoundaryData[Index] = nil
 	for _, RegisteredPart in RegisteredParts do
-		for _, Presences in RegisteredPart.Groups do
-			Presences[Index] = nil
+		for _, Value in RegisteredPart.Groups do
+			Value.LastPresences[Index] = nil
 		end
 	end
 	BoundaryGroups[Index] = nil
@@ -206,10 +206,10 @@ end
 local function RemoveRegisteredPart(Part: BasePart)
 	local RegisteredPart = RegisteredParts[Part]
 	if RegisteredPart == nil then return end
-	for Group, Presences in RegisteredPart.Groups do
+	for Group, Value in RegisteredPart.Groups do
 		local GroupCallbacks = BoundaryCallbacks[Group]
 		if GroupCallbacks == nil then continue end
-		for Index, Inside in Presences do
+		for Index, Inside in Value.LastPresences do
 			local Boundary = BoundaryData[Index]
 			if not Inside or Boundary == nil then continue end
 			for _, Callback in GroupCallbacks.Exited do
@@ -264,8 +264,8 @@ local function OnPostSimulation(DeltaTime: number)
 		QueryBoundaries(BVHRoot, Part, function(Index)
 			table.insert(CurrentBoundaries, Index)
 		end)
-		for Group, PartGroups in RegisteredPart.Groups do
-			local LastPresences = PartGroups.LastPresences
+		for Group, Value in RegisteredPart.Groups do
+			local LastPresences = Value.LastPresences
 			table.clear(CurrentPresences)
 			CurrentPresencesCount = 0
 			for _, Index in CurrentBoundaries do
@@ -277,7 +277,7 @@ local function OnPostSimulation(DeltaTime: number)
 			end
 			local GroupCallbacks = BoundaryCallbacks[Group]
 			if GroupCallbacks ~= nil then
-				LastPresencesCount = PartGroups.Count or 0
+				LastPresencesCount = Value.Count or 0
 				local IsFirstBoundary: boolean = LastPresencesCount <= 0
 				local IsLastBoundary: boolean = CurrentPresencesCount <= 0
 				-- Exited
@@ -301,7 +301,7 @@ local function OnPostSimulation(DeltaTime: number)
 				end
 			end
 			table.clear(LastPresences)
-			PartGroups.Count = CurrentPresencesCount
+			Value.Count = CurrentPresencesCount
 			for Index, _ in CurrentPresences do
 				LastPresences[Index] = true
 			end
@@ -414,7 +414,18 @@ function Boundaries.UntrackPart(Part: BasePart)
 	if RegisteredParts[Part] ~= nil then RemoveRegisteredPart(Part) end
 end
 function Boundaries.GetBoundariesContainingPart(Part: BasePart): {_BoundaryProperties}
-	-- TODO: Incomplete
+	local BoundariesWithPart = {}
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart ~= nil then
+		for _, Value in RegisteredPart.Groups do
+			for Index, Inside in Value.LastPresences do
+				local Boundary = BoundaryData[Index]
+				if Boundary == nil then continue end
+				if Inside then table.insert(BoundariesWithPart, Boundary) end
+			end
+		end
+	end
+	return BoundariesWithPart
 end
 function Boundaries.AssignGroups(Part: BasePart, ...: string)
 	local RegisteredPart = RegisteredParts[Part]
@@ -423,7 +434,12 @@ function Boundaries.AssignGroups(Part: BasePart, ...: string)
 	for i = 1, GroupCount do
 		local Group = select(i, ...)
 		if type(Group) ~= "string" then continue end
-		if RegisteredPart.Groups[Group] == nil then RegisteredPart.Groups[Group] = {} end
+		if RegisteredPart.Groups[Group] == nil then
+			RegisteredPart.Groups[Group] = {
+				["LastPresences"] = {},
+				["Count"] = 0,
+			}
+		end
 	end
 end
 function Boundaries.UnassignGroups(Part: BasePart, ...: string)
@@ -436,11 +452,24 @@ function Boundaries.UnassignGroups(Part: BasePart, ...: string)
 		RegisteredPart.Groups[Group] = nil
 	end
 end
-function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean
-	-- TODO: Incomplete
+function Boundaries.IsPartInGroups(Part: BasePart, ...: string): ...boolean?
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart == nil then return end
+	local GroupCount: number = select("#", ...)
+	if GroupCount == 0 then return end
+	local Output: {boolean} = {}
+	for i = 1, GroupCount do
+		Output[i] = RegisteredPart.Groups[select(i, ...)] ~= nil
+	end
+	return table.unpack(Output)
 end
 function Boundaries.GetPartGroups(Part: BasePart): {string}
-	-- TODO: Incomplete
+	local Output = {}
+	local RegisteredPart = RegisteredParts[Part]
+	if RegisteredPart ~= nil then
+		for i, _ in RegisteredPart.Groups do table.insert(Output, i) end
+	end
+	return Output
 end
 function Boundaries.OnEntered(Group: string, Callback: _EnteredCallback): () -> ()
 	local GroupCallbacks = BoundaryCallbacks[Group]
